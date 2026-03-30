@@ -7,6 +7,7 @@
 | 技能 | 描述 |
 |------|------|
 | [gitignore](skills/gitignore/SKILL.md) | 生成覆盖 Java、Go、Python、JS/Node.js、macOS、Windows 的 `.gitignore` |
+| [kb](skills/kb/SKILL.md) | 按项目和日期管理开发知识库，支持记录、读取、全文搜索 |
 
 ## 如何使用
 
