@@ -21,7 +21,7 @@ description: Use when the user wants to record, open, search, or manage a knowle
 
 | 命令 | 说明 |
 |------|------|
-| `/kb init` | 在当前项目创建 `.claude/kb-config.json` |
+| `/kb init` | 在当前项目创建 `.claude/kb/kb-config.json` |
 | `/kb record` | 将当前会话的功能实现或变动记录到知识库 |
 | `/kb open [filename]` | 将知识库中的文件读入当前会话，支持跨项目 |
 | `/kb search <keyword>` | 全文搜索知识库内容，支持跨项目 |
@@ -32,8 +32,8 @@ description: Use when the user wants to record, open, search, or manage a knowle
 
 ## Config Files（优先级从高到低）
 
-1. **项目级**：`{project-root}/.claude/kb-config.json` — `init` 创建，优先使用
-2. **全局**：`~/.claude/kb-config.json` — 全局默认
+1. **项目级**：`{project-root}/.claude/kb/kb-config.json` — `init` 创建，优先使用
+2. **全局**：`~/.claude/kb/kb-config.json` — 全局默认
 
 ```json
 {
@@ -51,8 +51,8 @@ python3 - << 'PYEOF'
 import os, json
 
 project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
-project_config = os.path.join(project_root, ".claude", "kb-config.json")
-global_config = os.path.expanduser("~/.claude/kb-config.json")
+project_config = os.path.join(project_root, ".claude", "kb", "kb-config.json")
+global_config = os.path.expanduser("~/.claude/kb/kb-config.json")
 
 config = {}
 for path in [project_config, global_config]:
@@ -82,7 +82,7 @@ PYEOF
 ## `init` — 初始化项目级配置
 
 1. 检测项目根目录（有 `.git` 的最近祖先目录，或当前目录）
-2. 若 `.claude/kb-config.json` 已存在，告知用户文件已存在，**直接跳过，不覆盖**
+2. 若 `.claude/kb/kb-config.json` 已存在，告知用户文件已存在，**直接跳过，不覆盖**
 3. 创建配置文件：
 
 ```bash
@@ -90,7 +90,7 @@ python3 - << 'PYEOF'
 import os, json
 
 project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
-config_dir = os.path.join(project_root, ".claude")
+config_dir = os.path.join(project_root, ".claude", "kb")
 config_file = os.path.join(config_dir, "kb-config.json")
 
 os.makedirs(config_dir, exist_ok=True)
