@@ -1,6 +1,6 @@
 ---
 name: kb
-description: Use when the user wants to record, open, search, or manage a knowledge base of feature implementations and project changes. Triggers on "/kb record", "/kb open", "/kb search", "/kb init", phrases like "记录到知识库", "save to knowledge base", "读取知识库", "搜索知识库", "log this change", "记录这次实现".
+description: 'Use when the user wants to record, open, search, or manage a knowledge base of feature implementations and project changes. Triggers on "/kb record", "/kb open", "/kb search", "/kb init", phrases like "记录到知识库", "save to knowledge base", "读取知识库", "搜索知识库", "log this change", "记录这次实现".'
 ---
 
 # Knowledge Base (kb)
