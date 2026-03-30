@@ -1,6 +1,6 @@
 ---
 name: template-skill
-description: Replace with a clear description of what this skill does and when Claude should trigger it. Be specific — vague descriptions cause undertriggering. Example: "Use when the user asks to do X, Y, or Z. Triggers on phrases like 'do X', '/x', 'help me with Y'."
+description: 'Replace with a clear description of what this skill does and when Claude should trigger it. Be specific — vague descriptions cause undertriggering. Example: "Use when the user asks to do X, Y, or Z. Triggers on phrases like do X, /x, help me with Y."'
 ---
 
 # Skill Name
