@@ -10,7 +10,21 @@
 
 ## 如何使用
 
-### 方式一：通过 Claude Code 插件市场安装
+### 方式一：通过 npx 安装（推荐）
+
+使用 `skills` CLI 工具安装单个技能：
+
+```bash
+# 安装指定技能
+npx skills add zebitx/skills/gitignore
+
+# 安装全部技能
+npx skills add zebitx/skills
+```
+
+技能会自动安装到 `~/.claude/skills/` 目录。
+
+### 方式二：通过 Claude Code 插件市场安装
 
 ```bash
 /plugin marketplace add zebitx/skills
@@ -18,7 +32,7 @@
 
 安装后，在对话中直接描述你的需求，Claude 会自动加载对应技能。
 
-### 方式二：手动配置
+### 方式三：手动配置
 
 将 `skills/` 目录下的技能文件复制到你的 Claude Code 配置目录：
 
@@ -26,7 +40,7 @@
 ~/.claude/skills/<skill-name>/SKILL.md
 ```
 
-### 方式三：直接引用
+### 方式四：直接引用
 
 在 `CLAUDE.md` 中通过 `@` 语法引用技能文件：
 
