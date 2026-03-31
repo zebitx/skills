@@ -8,6 +8,7 @@
 |------|------|
 | [gitignore](skills/gitignore/SKILL.md) | 生成覆盖 Java、Go、Python、JS/Node.js、macOS、Windows 的 `.gitignore` |
 | [kb](skills/kb/SKILL.md) | 按项目和日期管理开发知识库，支持记录、读取、全文搜索 |
+| [apifox-client](skills/apifox-client/SKILL.md) | 从 Apifox 读取接口定义供代码生成，或将本项目接口推送到 Apifox |
 
 ## 如何使用
 
@@ -56,6 +57,7 @@ npx skills add zebitx/skills
 | 技能 | 触发示例 |
 |------|---------|
 | gitignore | `帮我生成 .gitignore`、`create .gitignore`、`/gitignore` |
+| apifox-client | `读取接口定义`、`获取接口文档`、`同步接口到 Apifox`、`/apifox-client fetch`、`/apifox-client sync` |
 
 ## 项目结构
 
