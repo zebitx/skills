@@ -374,3 +374,31 @@ Sync complete! [project: backend]
 ```
 
 有错误时逐条展示 `data.errors`。非 200 响应时提示检查 token 和 projectId。
+
+---
+
+## Common Issues
+
+| 问题 | 解决 |
+|------|------|
+| `CONFIG_NOT_FOUND` | 先执行 `/apifox-client init` 创建配置 |
+| `401 Unauthorized` / `HTTP_ERROR:401` | Token 过期，重新生成后更新 `config.json` |
+| `404 Not Found` / `HTTP_ERROR:404` | projectId 错误，检查 Apifox 项目设置 → 基本设置 |
+| 接口名称搜索无结果 (`NOT_FOUND_NAME:`) | 检查名称拼写，或改用接口 ID |
+| 搜索命中多条 (`MULTIPLE:`) | skill 会列出候选，指定序号或 ID 选择 |
+| sync 后接口未更新 | 检查 `overwriteBehavior` 是否为 `KEEP_EXISTING` |
+| Folder ID 找不到 | 右键 Apifox 文件夹 → 复制链接，URL 中的数字即为 ID |
+| `SPEC_NOT_FOUND:` | Step 3 源码扫描未生成 spec 文件，检查框架识别和路由提取是否成功 |
+| `SYNC_ERROR:` | 上传失败，临时文件已保留，检查 token 和 projectId 后重试 |
+
+---
+
+## Guardrails
+
+- Token 输出时显示为 `AK-****`，不打印完整值
+- 多个项目且未指定时，必须用 **AskUserQuestion** 询问用户
+- fetch 搜索命中多条时，列出候选让用户确认后再使用
+- sync 仅在上传成功后删除临时文件 `/tmp/apifox-client-sync-{name}.json`
+- capabilities 不符合时，明确报错并提示如何修改配置
+- 已存在同名 project 修改配置前需用户确认
+- `moduleId` 为 null 且 capabilities 含 `"sync"` 时，init 后提示用户必须填写真实的 moduleId 才能使用 sync
