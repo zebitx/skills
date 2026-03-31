@@ -286,6 +286,8 @@ PYEOF
 - 若配置不存在，提示先执行 `/apifox-client init`
 - 若 token 缺失或仍为占位值（`AK-your-token-here`），用 **AskUserQuestion** 询问后写入配置（输出时显示 `AK-****`）
 
+解析 Step 1 输出的 `TOKEN:` 行获取 token，解析 `PROJECT:` 行（JSON 格式）获取各项目配置（name、projectId、capabilities、moduleId、folderId、overwriteBehavior），在 Step 2 中据此校验 project 和 capabilities，在 Step 4 中代入实际值。
+
 ### Step 2. 确定 project 和接口范围
 
 解析用户参数：
@@ -318,6 +320,9 @@ overwrite = "OVERWRITE_EXISTING"  # 从配置读取，替换为实际值
 token = "..."           # 从配置读取，替换为实际值
 
 spec_file = f"/tmp/apifox-client-sync-{project_name}.json"
+if not os.path.exists(spec_file):
+    print(f"SPEC_NOT_FOUND:{spec_file} Step 3 未生成 spec 文件，请检查源码扫描步骤")
+    import sys; sys.exit(0)
 spec = open(spec_file).read()
 
 payload = {
@@ -342,8 +347,18 @@ result = subprocess.run([
     "-d", json.dumps(payload)
 ], capture_output=True, text=True)
 
-print(result.stdout)
-os.remove(spec_file)
+response_text = result.stdout
+print(response_text)
+
+try:
+    resp = json.loads(response_text)
+    if resp.get("success") is False or "error" in resp:
+        print(f"SYNC_ERROR:{spec_file} 保留临时文件供排查")
+    else:
+        os.remove(spec_file)
+except (json.JSONDecodeError, Exception):
+    # Non-JSON response (e.g. network error), keep the file
+    print(f"SYNC_ERROR:{spec_file} 无法解析响应，保留临时文件供排查")
 PYEOF
 ```
 
