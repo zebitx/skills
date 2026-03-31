@@ -17,6 +17,8 @@ description: Use when the user wants to fetch API interface definitions from Api
 | `/apifox-client fetch <project> <id或名称> [...]` | 从 Apifox 读取接口定义 |
 | `/apifox-client sync [project] [接口范围]` | 扫描源码并推送接口到 Apifox |
 
+**脚本路径：** `~/.claude/skills/apifox-client/scripts/`
+
 ---
 
 ## Config File: `.claude/apifox-client/config.json`
@@ -56,67 +58,21 @@ description: Use when the user wants to fetch API interface definitions from Api
 ## `init` — 初始化项目配置
 
 1. 检测项目根目录（有 `.git` 的最近祖先目录，或当前目录）
-2. 若 `.claude/apifox-client/config.json` 已存在，告知用户，**直接跳过，不覆盖**
-3. 写入配置模板：
+2. 写入配置模板：
 
 ```bash
-python3 - << 'PYEOF'
-import os, json
-
-project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
-config_dir = os.path.join(project_root, ".claude", "apifox-client")
-config_file = os.path.join(config_dir, "config.json")
-
-if os.path.exists(config_file):
-    print(f"CONFIG_EXISTS:{config_file}")
-else:
-    os.makedirs(config_dir, exist_ok=True)
-
-    config = {
-        "accessToken": "AK-your-token-here",
-        "projects": [
-            {
-                "name": "my-project",
-                "projectId": 0,
-                "capabilities": ["read", "sync"],
-                "moduleId": None,
-                "folderId": None,
-                "overwriteBehavior": "OVERWRITE_EXISTING"
-            }
-        ]
-    }
-
-    with open(config_file, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-
-    print(f"CONFIG_CREATED:{config_file}")
-PYEOF
+python3 ~/.claude/skills/apifox-client/scripts/init-config.py
 ```
 
 - 若输出 `CONFIG_EXISTS:`，告知用户配置文件已存在，跳过初始化
 
-4. 将配置文件加入 `.gitignore`：
+3. 将配置文件加入 `.gitignore`：
 
 ```bash
-python3 - << 'PYEOF'
-import os
-
-project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
-gitignore = os.path.join(project_root, ".gitignore")
-entry = ".claude/apifox-client/config.json"
-
-existing = open(gitignore).read() if os.path.exists(gitignore) else ""
-if entry not in existing:
-    with open(gitignore, "a") as f:
-        f.write(f"\n{entry}\n")
-    print(f"GITIGNORE_UPDATED:{gitignore}")
-else:
-    print(f"GITIGNORE_ALREADY_SET:{gitignore}")
-PYEOF
+python3 ~/.claude/skills/apifox-client/scripts/init-gitignore.py
 ```
 
-5. 提示用户填写 `accessToken`、`projectId`、`moduleId`，并说明 capabilities 的含义。
+4. 提示用户填写 `accessToken`、`projectId`、`moduleId`，并说明 capabilities 的含义。若 `moduleId` 为 null 且 capabilities 含 `"sync"`，提示用户必须填写真实的 moduleId 才能使用 sync。
 
 ---
 
@@ -139,96 +95,35 @@ PYEOF
 ### Step 1. 读取配置并校验
 
 ```bash
-python3 - << 'PYEOF'
-import os, json, sys
-
-project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
-config_file = os.path.join(project_root, ".claude", "apifox-client", "config.json")
-
-if not os.path.exists(config_file):
-    print("CONFIG_NOT_FOUND")
-    sys.exit(0)
-
-with open(config_file) as f:
-    config = json.load(f)
-
-print(f"TOKEN:{config.get('accessToken', '')}")
-for p in config.get("projects", []):
-    caps = ",".join(p.get("capabilities", []))
-    print(f"PROJECT:{p['name']}:{p['projectId']}:{caps}")
-PYEOF
+python3 ~/.claude/skills/apifox-client/scripts/read-config.py
 ```
 
-- 若配置不存在，提示先执行 `/apifox-client init`
+解析输出：`TOKEN:{token}` 行获取 token，`PROJECT:{json}` 行（JSON 格式）获取各项目配置。
+
+- 若输出 `CONFIG_NOT_FOUND`，提示先执行 `/apifox-client init`
 - 若 token 缺失或仍为占位值（`AK-your-token-here`），用 **AskUserQuestion** 询问后写入配置（输出时显示 `AK-****`）
 - 若指定的 project 不存在于配置中，报错退出
 - 若 project `capabilities` 不含 `"read"`，报错：`项目 {name} 未配置 "read" capability，请在 config.json 中添加`
 
-解析 Step 1 输出的 `TOKEN:` 行和 `PROJECT:` 行，获取 `token` 和 `project_id`，将其与用户传入的标识符列表一起代入 Step 2 脚本中再执行。
-
 ### Step 2. 拉取接口定义
 
-对用户传入的每个标识符判断类型并调用 Apifox API：
+将 token、project_id 和用户传入的标识符列表代入以下命令执行：
 
 ```bash
-python3 - << 'PYEOF'
-import urllib.request, urllib.error, urllib.parse, json, os, sys
-
-token = "..."          # 从配置读取，替换为实际值
-project_id = 0         # 从配置读取，替换为实际值
-identifiers = [...]    # 用户传入的 id 或名称列表，替换为实际值
-
-BASE = "https://api.apifox.com/v1"
-HEADERS = {
-    "Authorization": f"Bearer {token}",
-    "X-Apifox-Api-Version": "2024-03-28"
-}
-
-def api_get(url):
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req) as r:
-            return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        print(f"HTTP_ERROR:{e.code}:{url}")
-        return None
-
-results = []
-for ident in identifiers:
-    if str(ident).isdigit():
-        # 按 ID 精确获取
-        data = api_get(f"{BASE}/projects/{project_id}/http-apis/{ident}")
-        if data is None: continue
-        api = data.get("data", {})
-        if api:
-            results.append(api)
-        else:
-            print(f"NOT_FOUND_ID:{ident}")
-    else:
-        # 按名称搜索
-        encoded = urllib.parse.quote(str(ident))
-        data = api_get(f"{BASE}/projects/{project_id}/http-apis?keywords={encoded}")
-        if data is None: continue
-        items = data.get("data", {}).get("items", [])
-        if len(items) == 0:
-            print(f"NOT_FOUND_NAME:{ident}")
-        elif len(items) == 1:
-            results.append(items[0])
-        else:
-            # 多条命中，输出候选列表
-            candidates = [{"id": i["id"], "name": i.get("name",""), "method": i.get("method",""), "path": i.get("path","")} for i in items]
-            print(f"MULTIPLE:{ident}:" + json.dumps(candidates, ensure_ascii=False))
-
-print("RESULTS:" + json.dumps(results, ensure_ascii=False))
-PYEOF
+python3 ~/.claude/skills/apifox-client/scripts/fetch-api.py {token} {project_id} {identifier1} [identifier2 ...]
 ```
 
-- 若某标识符返回 `MULTIPLE:`，向用户列出候选（id、name、method、path），询问选择哪个；获得用户回复后，将该标识符替换为选定的数字 ID，重新执行 Step 2（仅针对该标识符），然后将结果合并到 `results` 中再继续 Step 3
-- 若某标识符 `NOT_FOUND_*`，告知用户该标识符未找到，继续处理其余标识符
+输出说明：
+- `NOT_FOUND_ID:{id}` — 指定 ID 不存在
+- `NOT_FOUND_NAME:{name}` — 名称搜索无结果
+- `MULTIPLE:{name}:[...]` — 名称搜索命中多条，向用户列出候选（id、name、method、path），询问选择哪个；获得用户回复后将该标识符替换为选定的数字 ID，重新执行本步骤（仅针对该标识符），将结果合并到 `RESULTS` 中再继续
+- `RESULTS:[...]` — 所有成功获取的接口 JSON 数组
+
+若某标识符 `NOT_FOUND_*`，告知用户，继续处理其余标识符。
 
 ### Step 3. 格式化输出
 
-将 `results` 中每条接口按以下格式输出，供用户结合提示词生成代码：
+将 `RESULTS` 中每条接口按以下格式输出：
 
 ```
 已加载 N 个接口定义：
@@ -240,7 +135,7 @@ PYEOF
   查询参数：{parameters where in=query}
   请求头：{parameters where in=header}
   请求体：{requestBody schema}
-  响应：{responses["200"] schema}
+  响应：{responses["200"] schema，若无则取第一个 2xx}
 
 [接口 2] ...
 ```
@@ -256,37 +151,23 @@ PYEOF
 ### 用法
 
 ```
-/apifox-client sync                        # 仅一个 sync 项目时直接使用
-/apifox-client sync backend               # 指定 project
-/apifox-client sync backend /users /orders # 只同步匹配路径的接口
-/apifox-client sync backend UserController # 只同步指定控制器
+/apifox-client sync                              # 仅一个 sync 项目时直接使用
+/apifox-client sync backend                     # 指定 project
+/apifox-client sync backend /users /orders      # 只同步匹配路径的接口
+/apifox-client sync backend UserController      # 只同步指定控制器
 /apifox-client sync backend /users UserController # 混合
 ```
 
 ### Step 1. 读取配置
 
 ```bash
-python3 - << 'PYEOF'
-import os, json
-
-project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
-config_file = os.path.join(project_root, ".claude", "apifox-client", "config.json")
-
-if not os.path.exists(config_file):
-    print("CONFIG_NOT_FOUND")
-else:
-    with open(config_file) as f:
-        config = json.load(f)
-    print(f"TOKEN:{config.get('accessToken', '')}")
-    for p in config.get("projects", []):
-        print(f"PROJECT:{json.dumps(p)}")
-PYEOF
+python3 ~/.claude/skills/apifox-client/scripts/read-config.py
 ```
 
-- 若配置不存在，提示先执行 `/apifox-client init`
-- 若 token 缺失或仍为占位值（`AK-your-token-here`），用 **AskUserQuestion** 询问后写入配置（输出时显示 `AK-****`）
+解析输出：`TOKEN:{token}` 行获取 token，`PROJECT:{json}` 行（JSON 格式）获取各项目配置（name、projectId、capabilities、moduleId、folderId、overwriteBehavior），在 Step 2 中据此校验，在 Step 4 中代入实际值。
 
-解析 Step 1 输出的 `TOKEN:` 行获取 token，解析 `PROJECT:` 行（JSON 格式）获取各项目配置（name、projectId、capabilities、moduleId、folderId、overwriteBehavior），在 Step 2 中据此校验 project 和 capabilities，在 Step 4 中代入实际值。
+- 若输出 `CONFIG_NOT_FOUND`，提示先执行 `/apifox-client init`
+- 若 token 缺失或仍为占位值（`AK-your-token-here`），用 **AskUserQuestion** 询问后写入配置（输出时显示 `AK-****`）
 
 ### Step 2. 确定 project 和接口范围
 
@@ -308,61 +189,15 @@ PYEOF
 
 ### Step 4. 上传到 Apifox
 
+将配置值代入以下命令执行（`module_id` 或 `folder_id` 为 null 时传字符串 `"null"`）：
+
 ```bash
-python3 - << 'PYEOF'
-import json, subprocess, os
-
-project_name = "..."    # 从用户参数读取，替换为实际值
-project_id = 0          # 从配置读取，替换为实际值
-module_id = None        # 从配置读取，替换为实际值
-folder_id = None        # 从配置读取，替换为实际值
-overwrite = "OVERWRITE_EXISTING"  # 从配置读取，替换为实际值
-token = "..."           # 从配置读取，替换为实际值
-
-spec_file = f"/tmp/apifox-client-sync-{project_name}.json"
-if not os.path.exists(spec_file):
-    print(f"SPEC_NOT_FOUND:{spec_file} Step 3 未生成 spec 文件，请检查源码扫描步骤")
-    import sys; sys.exit(0)
-spec = open(spec_file).read()
-
-payload = {
-    "input": spec,
-    "options": {
-        "endpointOverwriteBehavior": overwrite,
-        "schemaOverwriteBehavior": "OVERWRITE_EXISTING",
-        "updateFolderOfChangedEndpoint": False
-    }
-}
-if module_id is not None:
-    payload["options"]["moduleId"] = module_id
-if folder_id is not None:
-    payload["options"]["targetEndpointFolderId"] = folder_id
-
-result = subprocess.run([
-    "curl", "-s", "-X", "POST",
-    f"https://api.apifox.com/v1/projects/{project_id}/import-openapi",
-    "-H", f"Authorization: Bearer {token}",
-    "-H", "X-Apifox-Api-Version: 2024-03-28",
-    "-H", "Content-Type: application/json",
-    "-d", json.dumps(payload)
-], capture_output=True, text=True)
-
-response_text = result.stdout
-print(response_text)
-
-try:
-    resp = json.loads(response_text)
-    if resp.get("success") is False or "error" in resp:
-        print(f"SYNC_ERROR:{spec_file} 保留临时文件供排查")
-    else:
-        os.remove(spec_file)
-except (json.JSONDecodeError, Exception):
-    # Non-JSON response (e.g. network error), keep the file
-    print(f"SYNC_ERROR:{spec_file} 无法解析响应，保留临时文件供排查")
-PYEOF
+python3 ~/.claude/skills/apifox-client/scripts/sync-upload.py {project_name} {project_id} {module_id|null} {folder_id|null} {overwrite} {token}
 ```
 
-在执行前，将脚本中的占位符替换为从配置和用户参数中读取的实际值。
+输出说明：
+- `SPEC_NOT_FOUND:` — Step 3 未生成 spec 文件
+- `SYNC_ERROR:` — 上传失败，临时文件已保留供排查
 
 ### Step 5. 展示结果
 
