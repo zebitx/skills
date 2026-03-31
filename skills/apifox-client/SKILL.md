@@ -384,7 +384,9 @@ Sync complete! [project: backend]
 | `CONFIG_NOT_FOUND` | 先执行 `/apifox-client init` 创建配置 |
 | `401 Unauthorized` / `HTTP_ERROR:401` | Token 过期，重新生成后更新 `config.json` |
 | `404 Not Found` / `HTTP_ERROR:404` | projectId 错误，检查 Apifox 项目设置 → 基本设置 |
+| `HTTP_ERROR:{其他状态码}` | 403 = token 权限不足；429 = 请求过于频繁，稍后重试；500 = Apifox 服务异常 |
 | 接口名称搜索无结果 (`NOT_FOUND_NAME:`) | 检查名称拼写，或改用接口 ID |
+| `NOT_FOUND_ID:{id}` | 指定的接口 ID 不存在于该项目，检查 ID 是否正确 |
 | 搜索命中多条 (`MULTIPLE:`) | skill 会列出候选，指定序号或 ID 选择 |
 | sync 后接口未更新 | 检查 `overwriteBehavior` 是否为 `KEEP_EXISTING` |
 | Folder ID 找不到 | 右键 Apifox 文件夹 → 复制链接，URL 中的数字即为 ID |
@@ -400,5 +402,5 @@ Sync complete! [project: backend]
 - fetch 搜索命中多条时，列出候选让用户确认后再使用
 - sync 仅在上传成功后删除临时文件 `/tmp/apifox-client-sync-{name}.json`
 - capabilities 不符合时，明确报错并提示如何修改配置
-- 已存在同名 project 修改配置前需用户确认
+- 已存在同名 project 时，修改配置前需用户确认
 - `moduleId` 为 null 且 capabilities 含 `"sync"` 时，init 后提示用户必须填写真实的 moduleId 才能使用 sync
