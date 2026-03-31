@@ -164,13 +164,15 @@ PYEOF
 - 若指定的 project 不存在于配置中，报错退出
 - 若 project `capabilities` 不含 `"read"`，报错：`项目 {name} 未配置 "read" capability，请在 config.json 中添加`
 
+解析 Step 1 输出的 `TOKEN:` 行和 `PROJECT:` 行，获取 `token` 和 `project_id`，将其与用户传入的标识符列表一起代入 Step 2 脚本中再执行。
+
 ### Step 2. 拉取接口定义
 
 对用户传入的每个标识符判断类型并调用 Apifox API：
 
 ```bash
 python3 - << 'PYEOF'
-import urllib.request, urllib.parse, json, os, sys
+import urllib.request, urllib.error, urllib.parse, json, os, sys
 
 token = "..."          # 从配置读取，替换为实际值
 project_id = 0         # 从配置读取，替换为实际值
@@ -183,15 +185,20 @@ HEADERS = {
 }
 
 def api_get(url):
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read())
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        print(f"HTTP_ERROR:{e.code}:{url}")
+        return None
 
 results = []
 for ident in identifiers:
     if str(ident).isdigit():
         # 按 ID 精确获取
         data = api_get(f"{BASE}/projects/{project_id}/http-apis/{ident}")
+        if data is None: continue
         api = data.get("data", {})
         if api:
             results.append(api)
@@ -201,6 +208,7 @@ for ident in identifiers:
         # 按名称搜索
         encoded = urllib.parse.quote(str(ident))
         data = api_get(f"{BASE}/projects/{project_id}/http-apis?keywords={encoded}")
+        if data is None: continue
         items = data.get("data", {}).get("items", [])
         if len(items) == 0:
             print(f"NOT_FOUND_NAME:{ident}")
@@ -215,7 +223,7 @@ print("RESULTS:" + json.dumps(results, ensure_ascii=False))
 PYEOF
 ```
 
-- 若某标识符返回 `MULTIPLE:`，向用户列出候选并询问选择哪个，再按 ID 重新拉取
+- 若某标识符返回 `MULTIPLE:`，向用户列出候选（id、name、method、path），询问选择哪个；获得用户回复后，将该标识符替换为选定的数字 ID，重新执行 Step 2（仅针对该标识符），然后将结果合并到 `results` 中再继续 Step 3
 - 若某标识符 `NOT_FOUND_*`，告知用户该标识符未找到，继续处理其余标识符
 
 ### Step 3. 格式化输出
