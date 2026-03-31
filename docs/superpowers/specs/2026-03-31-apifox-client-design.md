@@ -28,8 +28,7 @@
       "capabilities": ["read", "sync"],
       "moduleId": 78901,
       "folderId": null,
-      "overwriteBehavior": "OVERWRITE_EXISTING",
-      "openApiUrl": ""
+      "overwriteBehavior": "OVERWRITE_EXISTING"
     }
   ]
 }
@@ -46,7 +45,6 @@
 | `moduleId` | 模块 ID | `"sync"` 时必填 |
 | `folderId` | 文件夹 ID，null = 根目录 | 可选 |
 | `overwriteBehavior` | `OVERWRITE_EXISTING` \| `AUTO_MERGE` \| `KEEP_EXISTING` \| `CREATE_NEW` | sync 时可选，默认 `OVERWRITE_EXISTING` |
-| `openApiUrl` | 运行中服务的 OpenAPI spec URL，sync 时优先使用 | 可选 |
 
 ### 校验规则（init 时检查）
 
@@ -133,7 +131,7 @@
 
 **执行步骤（沿用 apifox skill）：**
 1. 读取配置，解析 target 和接口范围
-2. 获取 OpenAPI spec（优先 `openApiUrl`，否则扫描源码）
+2. 扫描源码生成 OpenAPI spec
 3. 上传到 `POST https://api.apifox.com/v1/projects/{projectId}/import-openapi`
 4. 展示结果（created/updated/failed 统计）
 5. 删除临时文件
