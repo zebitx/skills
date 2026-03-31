@@ -67,34 +67,53 @@ project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read
 config_dir = os.path.join(project_root, ".claude", "apifox-client")
 config_file = os.path.join(config_dir, "config.json")
 
-os.makedirs(config_dir, exist_ok=True)
+if os.path.exists(config_file):
+    print(f"CONFIG_EXISTS:{config_file}")
+else:
+    os.makedirs(config_dir, exist_ok=True)
 
-config = {
-    "accessToken": "AK-your-token-here",
-    "projects": [
-        {
-            "name": "my-project",
-            "projectId": 0,
-            "capabilities": ["read", "sync"],
-            "moduleId": 0,
-            "folderId": None,
-            "overwriteBehavior": "OVERWRITE_EXISTING"
-        }
-    ]
-}
+    config = {
+        "accessToken": "AK-your-token-here",
+        "projects": [
+            {
+                "name": "my-project",
+                "projectId": 0,
+                "capabilities": ["read", "sync"],
+                "moduleId": None,
+                "folderId": None,
+                "overwriteBehavior": "OVERWRITE_EXISTING"
+            }
+        ]
+    }
 
-with open(config_file, "w", encoding="utf-8") as f:
-    json.dump(config, f, indent=2, ensure_ascii=False)
-    f.write("\n")
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 
-print(f"CONFIG_CREATED:{config_file}")
+    print(f"CONFIG_CREATED:{config_file}")
 PYEOF
 ```
+
+- 若输出 `CONFIG_EXISTS:`，告知用户配置文件已存在，跳过初始化
 
 4. 将配置文件加入 `.gitignore`：
 
 ```bash
-grep -q "apifox-client/config.json" .gitignore 2>/dev/null || echo ".claude/apifox-client/config.json" >> .gitignore
+python3 - << 'PYEOF'
+import os
+
+project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
+gitignore = os.path.join(project_root, ".gitignore")
+entry = ".claude/apifox-client/config.json"
+
+existing = open(gitignore).read() if os.path.exists(gitignore) else ""
+if entry not in existing:
+    with open(gitignore, "a") as f:
+        f.write(f"\n{entry}\n")
+    print(f"GITIGNORE_UPDATED:{gitignore}")
+else:
+    print(f"GITIGNORE_ALREADY_SET:{gitignore}")
+PYEOF
 ```
 
 5. 提示用户填写 `accessToken`、`projectId`、`moduleId`，并说明 capabilities 的含义。
