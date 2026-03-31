@@ -248,3 +248,114 @@ PYEOF
 - 字段为空时跳过该行
 - 请求体和响应 schema 输出 JSON Schema 的 `properties` 摘要（字段名: 类型）
 - 输出完成后提示：**"接口定义已加载，请告诉我需要生成什么代码（如 axios、OpenFeign）"**
+
+---
+
+## `sync` — 推送接口到 Apifox
+
+### 用法
+
+```
+/apifox-client sync                        # 仅一个 sync 项目时直接使用
+/apifox-client sync backend               # 指定 project
+/apifox-client sync backend /users /orders # 只同步匹配路径的接口
+/apifox-client sync backend UserController # 只同步指定控制器
+/apifox-client sync backend /users UserController # 混合
+```
+
+### Step 1. 读取配置
+
+```bash
+python3 - << 'PYEOF'
+import os, json
+
+project_root = os.popen("git rev-parse --show-toplevel 2>/dev/null || pwd").read().strip()
+config_file = os.path.join(project_root, ".claude", "apifox-client", "config.json")
+
+if not os.path.exists(config_file):
+    print("CONFIG_NOT_FOUND")
+else:
+    with open(config_file) as f:
+        config = json.load(f)
+    print(f"TOKEN:{config.get('accessToken', '')}")
+    for p in config.get("projects", []):
+        print(f"PROJECT:{json.dumps(p)}")
+PYEOF
+```
+
+- 若配置不存在，提示先执行 `/apifox-client init`
+- 若 token 缺失或仍为占位值（`AK-your-token-here`），用 **AskUserQuestion** 询问后写入配置（输出时显示 `AK-****`）
+
+### Step 2. 确定 project 和接口范围
+
+解析用户参数：
+- **第一个非路径、非控制器参数** = project name
+- **以 `/` 开头** = 路由路径过滤器（前缀匹配）
+- **大写开头或含 `Controller` / `Handler` / `Router`** = 控制器/文件名过滤器
+- 未指定 project 时：若只有一个 `capabilities` 含 `"sync"` 的项目直接使用，多个则用 **AskUserQuestion** 询问
+- 若 project `capabilities` 不含 `"sync"`，报错：`项目 {name} 未配置 "sync" capability，请在 config.json 中添加`
+
+### Step 3. 扫描源码生成 OpenAPI Spec
+
+- 识别框架（Spring Boot、Express、FastAPI、NestJS、Go Gin 等）
+- 用 Glob/Grep/Read 找路由/控制器文件（可按控制器名过滤）
+- 提取：HTTP 方法、路径、参数、请求体、响应 schema、注释
+- 可复用 schema 放入 `components/schemas`
+- 路径过滤器不为空时，只保留匹配前缀的路径
+- 输出 OpenAPI 3.0 JSON 写入 `/tmp/apifox-client-sync-{name}.json`
+
+### Step 4. 上传到 Apifox
+
+```bash
+python3 - << 'PYEOF'
+import json, subprocess, os
+
+project_name = "..."    # 从用户参数读取，替换为实际值
+project_id = 0          # 从配置读取，替换为实际值
+module_id = None        # 从配置读取，替换为实际值
+folder_id = None        # 从配置读取，替换为实际值
+overwrite = "OVERWRITE_EXISTING"  # 从配置读取，替换为实际值
+token = "..."           # 从配置读取，替换为实际值
+
+spec_file = f"/tmp/apifox-client-sync-{project_name}.json"
+spec = open(spec_file).read()
+
+payload = {
+    "input": spec,
+    "options": {
+        "endpointOverwriteBehavior": overwrite,
+        "schemaOverwriteBehavior": "OVERWRITE_EXISTING",
+        "updateFolderOfChangedEndpoint": False
+    }
+}
+if module_id is not None:
+    payload["options"]["moduleId"] = module_id
+if folder_id is not None:
+    payload["options"]["targetEndpointFolderId"] = folder_id
+
+result = subprocess.run([
+    "curl", "-s", "-X", "POST",
+    f"https://api.apifox.com/v1/projects/{project_id}/import-openapi",
+    "-H", f"Authorization: Bearer {token}",
+    "-H", "X-Apifox-Api-Version: 2024-03-28",
+    "-H", "Content-Type: application/json",
+    "-d", json.dumps(payload)
+], capture_output=True, text=True)
+
+print(result.stdout)
+os.remove(spec_file)
+PYEOF
+```
+
+在执行前，将脚本中的占位符替换为从配置和用户参数中读取的实际值。
+
+### Step 5. 展示结果
+
+```
+Sync complete! [project: backend]
+  Scope: /users, /orders (filtered)
+  Endpoints: 3 created, 5 updated, 0 failed
+  Schemas:   2 created, 1 updated, 0 failed
+```
+
+有错误时逐条展示 `data.errors`。非 200 响应时提示检查 token 和 projectId。
